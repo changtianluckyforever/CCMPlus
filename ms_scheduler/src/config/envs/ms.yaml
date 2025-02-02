@@ -1,0 +1,29 @@
+seed: 42
+
+# Env
+env_args:
+  # Cluster
+  gpu_per_node: 8
+  cpu_per_node: 96
+  mem_per_node: 512
+  num_node: 8
+  num_models: 8
+  # Workload
+  arrival_rate: ~
+  arrival_lam: ~
+  arrival_scale: 10.  # [S , M 10., L 5., XL ]
+  # Scheduler
+  days_limit: 14
+  window_day: 7
+  feat_dim: 25
+  seq_feat_dim: 4 # ['value', 'day', 'weekday', 'hour']
+
+  train_dataset_ratio: 0.8
+  reward_type: "inverse"
+  map_name: "medium_1"
+  display: False
+  export_stats: False
+  to_csv: False
+  verbose: False
+
+t_max: 1000000
