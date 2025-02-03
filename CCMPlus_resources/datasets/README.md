@@ -4,10 +4,9 @@
 
 
 
-Because the limit for dataset size in the Github website,
-All datasets are available in the link:
+Datasets are available in this folder.
 
-https://drive.google.com/drive/folders/1YnFb8EPA0sp0-A7K02bHn868XhUpbqim?usp=sharing
+
 
 
 
