@@ -118,7 +118,7 @@ class ManifoldEmbedding(nn.Module):
                         # the shape of torch.matmul(vx, vx_hat.mT) is [B, N, N]
                         # the shape of pearson_cor is [B, N, N]
 
-                    # 挑出来和第一个服务最相关的那几个服务
+                    # 挑出来和第一个服务最相关的那几个服务, Pick out the few services that are most relevant to the first service.
                     if self.sparse_corr:
                         if self.args.use_epsilon_greedy_sparse:
                             # self.low_rank_d is the number of top-k values to keep
@@ -242,14 +242,14 @@ class ManifoldEmbedding(nn.Module):
                     # the shape of target_ccm is [B, N, L_out]
                     # Expand target_ccm for gathering values across all services
                     Y_i_expanded = target_ccm.unsqueeze(1).expand(B, N, N, L_out)  # Shape: [B, N, N, L_out]
-                    # the shape of Y_i_expanded is [B, N, N, L_out], 第一个N是对后面的 （N, L_out）复制扩展, 第二个N代表有N个service
+                    # the shape of Y_i_expanded is [B, N, N, L_out], 第一个N是对后面的 （N, L_out）复制扩展, 第二个N代表有N个service, The first "N" refers to replicating and expanding the (N, L_out), while the second "N" represents having N services.
 
                     # Expand and transpose Y_i_expanded to align with nearest_indices_expanded
                     Y_i_expanded = Y_i_expanded.unsqueeze(-1).expand(
                         -1, -1, -1, -1, L_out
                     )  # Sh ape: [B, N, N, L_out, L_out]
                     Y_i_transposed = Y_i_expanded.transpose(-1, -2)  # Shape: [B, N, N, L_out, L_out]
-                    # in the dimension of Y_i_transposed, 第一个L_out代表对时间序列重复L_out次, 第一个N是对后面的 （N, L_out, L_out）复制扩展, 第二个N代表有N个service
+                    # in the dimension of Y_i_transposed, 第一个L_out代表对时间序列重复L_out次, 第一个N是对后面的 （N, L_out, L_out）复制扩展, 第二个N代表有N个service, The first "L_out" represents repeating the time series L_out times. The first "N" refers to replicating and expanding the (N, L_out, L_out). The second "N" represents having N services.
 
                     # the shape of nearest_indices is [B, N, L_out, d_model+1]
                     # Use the nearest_indices to gather corresponding Y_i values across all services
@@ -258,7 +258,8 @@ class ManifoldEmbedding(nn.Module):
                     )  # Shape: [B, N, N, L_out, d_model + 1]
                     # the shape of Y_i_transposed is [B, N, N, L_out, L_out]
                     # the shape of nearest_indices_expanded is [B, N, N, L_out, d_model+1],
-                    # 第二个N是对后面的 （L_out, d_model+1）复制扩展N 次, 第一个N代表有N个service
+                    # 第二个N是对后面的 （L_out, d_model+1）复制扩展N 次, 第一个N代表有N个service 
+                    #The second "N" refers to replicating and expanding the (L_out, d_model + 1) N times. The first "N" represents having N services.
 
                     # the shape of Y_i_transposed is [B, N, N, L_out, L_out]
                     # the shape of nearest_indices_expanded is [B, N, N, L_out, d_model+1]
@@ -267,11 +268,12 @@ class ManifoldEmbedding(nn.Module):
                     )  # Shape: [B, N, N, L_out, d_model + 1]
                     # the shape of Y_nearest is [B, N, N, L_out, d_model + 1]
                     # 第一个N代表有N个service, 第二个N代表N个service其中的一个service的nearest index， （L_out, d_model + 1）， 在N个service中抽取的values
+                    # The first "N" represents having N services. The second "N" represents the nearest index of one service among the N services. (L_out, d_model + 1) are the values extracted from the N services.
 
                     # the shape of nearest_distances is [B, N, L_out, d_model+1]
                     # the shape of u_z is [B, N, L_out, d_model+1]
                     # the shape of w_z is [B, N, L_out, d_model+1]
-                    # N代表有N个service
+                    # N means  N services
                     # Calculate weights w_z for the nearest neighbors
                     u_z = torch.exp(
                         -nearest_distances / (nearest_distances[:, :, :, 0:1] + 1e-6)
@@ -284,12 +286,15 @@ class ManifoldEmbedding(nn.Module):
                     Y_i_hat = torch.sum(w_z.unsqueeze(2) * Y_nearest, dim=-1)
                     # the shape of Y_i_hat is [B, N, N, L_out]
                     # 第一个N代表有N个service, 第二个N代表第一个N中的service，其中的一个service去计算weight，利用ccm去预测N个service的 L_out。
+                    # The first "N" represents having N services. The second "N" represents one service among the first N services, which is used to compute the weight. CCM is then used to predict L_out for the N services.
+                    
                     # the shape of Y_i_hat is [B, N, N, L_out]
                     # the shape of target_ccm is [B, N, L_out]
 
                     # Expand target_ccm to match the shape of Y_i_hat for mean and std calculations
                     target_ccm_expanded = target_ccm.unsqueeze(1).expand(B, N, N, L_out)  # Shape: [B, N, N, L_out]
                     # 第2个N代表有N个service, 第一个N代表对后面的 （N, L_out）复制扩展N次
+                    # The second "N" represents having N services. The first "N" refers to replicating and expanding the (N, L_out) N times.
 
                     if self.low_rank_corr:
                         Y_i_hat = torch.matmul(Y_i_hat, self.W)
@@ -304,9 +309,11 @@ class ManifoldEmbedding(nn.Module):
                     mean_Y_hat = Y_i_hat.mean(dim=-1, keepdim=True)  # Shape: [B, N, N, 1]
                     std_Y = target_ccm_expanded.std(dim=-1, keepdim=True)  # Shape: [B, N, N, 1]
                     # 第二个N代表有N个service， 第一个N代表对后面的 （N, 1）复制扩展N次
+                    # The second "N" represents having N services. The first "N" refers to replicating and expanding the (N, 1) N times.
                     std_Y_hat = Y_i_hat.std(dim=-1, keepdim=True)  # Shape: [B, N, N, 1]
                     # 第一个N代表有N个service (用其中一个去生成weight）, 第二个N代表第一个N中的service，其中的一个service去计算weight，利用ccm去预测N个service的 L_out 的std
-
+                    # The first N represents having N services (using one of them to generate the weight). The second N represents one service among the first N services, which is used to compute the weight. CCM is then used to predict the std of L_out for the N services.
+                    
                     if self.momentum_pearson_flag:
                         # now the shape of pearson_corr is [N, N]
                         pearson_cor_past = pearson_cor.unsqueeze(0).expand(B, -1, -1)
@@ -316,14 +323,18 @@ class ManifoldEmbedding(nn.Module):
                             (target_ccm_expanded - mean_Y) * (Y_i_hat - mean_Y_hat), dim=-1
                         )  # Shape: [B, N, N]
                         # 第一个N代表扩展N次，第二个N代表有N个service
+                        # The first N represents expanding N times. The second N represents having N services.
 
                         # Compute the Pearson correlation coefficient
                         corr = covariance / (std_Y * std_Y_hat + 1e-6)  # Shape: [B, N, N]
                         # the shape of std_Y * std_Y_hat is [B, N, N, 1]
                         # 第一个N代表扩展N次（每一次用一个service去生成weight）, 第二个N代表有N个service
+                        # The first N represents expanding N times (using a different service to generate the weight in each expansion). The second N represents having N services.
+                        
                         # the shape of covariance is [B, N, N]
                         # the shape of corr is [B, N, N]
                         # 第一个N代表扩展N次（每一次用一个service去生成weight）, 第二个N代表有N个service
+                        # The first N represents expanding N times (each time using a different service to generate the weight). The second N represents having N services.
 
                         # transpose the corr matrix, to swap the last two dimensions
                         corr = corr.transpose(1, 2)  # Shape: [B, N, N]
@@ -340,14 +351,18 @@ class ManifoldEmbedding(nn.Module):
                             (target_ccm_expanded - mean_Y) * (Y_i_hat - mean_Y_hat), dim=-1
                         )  # Shape: [B, N, N]
                         # 第一个N代表扩展N次，第二个N代表有N个service
+                        # The first N represents expanding N times. The second N represents having N services
 
                         # Compute the Pearson correlation coefficient
                         corr = covariance / (std_Y.squeeze(-1) * std_Y_hat.squeeze(-1) + 1e-6)  # Shape: [B, N, N]
                         # the shape of std_Y * std_Y_hat is [B, N, N, 1]
                         # 第一个N代表扩展N次（每一次用一个service去生成weight）, 第二个N代表有N个service
+                        # The first N represents expanding N times (each time using a different service to generate the weight). The second N represents having N services
+                        
                         # the shape of covariance is [B, N, N]
                         # the shape of corr is [B, N, N]
                         # 第一个N代表扩展N次（每一次用一个service去生成weight）, 第二个N代表有N个service
+                        # The first N represents expanding N times (each time using one service to generate the weight). The second N represents having N services
 
                         # transpose the corr matrix, to swap the last two dimensions
                         corr = corr.transpose(1, 2)  # Shape: [B, N, N]
@@ -356,6 +371,7 @@ class ManifoldEmbedding(nn.Module):
                         # the shape of pearson_cor is [B, N, N]
 
                     # 挑出来和第一个服务最相关的那几个服务
+                    # Pick out the services that are most relevant to the first service
                     if self.sparse_corr:
                         if self.args.use_epsilon_greedy_sparse:
                             # self.low_rank_d is the number of top-k values to keep
@@ -502,6 +518,8 @@ class ManifoldEmbedding(nn.Module):
         conv_x = rearrange(conv_out, "(b n) d -> b n d", b=B)
         # the shape of conv_x is [B, N, D]
         # 让其他服务的第一个维度的数值，来根据加权决定，第一个服务的第一个特征数值
+        # Let the values of the first dimension from other services determine the first feature value of the first service based on weighted aggregation
+        
         # the data type of pearson_cor is torch.float32
         conv_x = torch.matmul(pearson_multiplier, conv_x)
         # the shape of conv_x is [B, N, D]
